@@ -1,0 +1,182 @@
+#root {
+
+  width: 100vw;
+  height: 100vh;
+  overflow-y: scroll;
+
+  >.soccer-board {
+    
+    --main-padding: 10px;
+    --half-gap: 3px;
+
+    display: flex;
+    flex-direction: column;
+    position: relative;
+
+    width: calc(100% - var(--main-padding) * 2);
+    height: calc(100% - var(--main-padding) * 2);
+
+    padding: var(--main-padding) var(--main-padding) 0 var(--main-padding);
+    gap: calc(var(--half-gap) * 2);
+
+    >.board-area {
+      display: flex;
+      position: relative;
+      flex-direction: column;
+      width: 100%;
+      height: calc(70% - var(--half-gap) - var(--main-padding));
+      gap: calc(var(--half-gap) * 2);
+
+      >.image-soccer-court {
+        display: flex;
+        position: relative;
+        z-index: 0;
+        height: calc(65% - var(--half-gap));
+        width: 100%;
+      }
+
+      >.bench {
+        display: flex;
+        position: relative;
+        z-index: 0;
+        height: calc(35% - var(--half-gap));
+        width: 100%;
+        background-color: lightgray;
+
+        &::before {
+          content: 'ベンチ';
+          position: absolute;
+          top: 5px;
+          left: 10px;
+          font-size: 12px;
+          color: #666;
+          font-weight: bold;
+          z-index: 1;
+        }
+      }
+
+      >.player-area {
+        position: absolute; 
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        z-index: 10;
+        pointer-events: none; // player-area自体はクリック無効
+
+        >.draggable-player {
+          position: absolute;
+          transform: translate(-50%, -50%);
+          cursor: grab;
+          user-select: none;
+          touch-action: none;
+          width: 8vh;
+          height: 6vh;
+          container-type: inline-size;
+          pointer-events: painted; // 駒自体はクリック有効
+
+          &:active {
+            cursor: grabbing; // 追加
+          }
+
+          >.piece-player {
+            font-size: 22cqw;
+          }
+
+          &.in-bench {
+            opacity: 0.95;
+            
+            .piece-player {
+              box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+              border: 2px solid #f59e0b;
+            }
+          }
+        }
+      }
+    }
+
+    >.button-area {
+      display: flex;
+      flex-flow: wrap;
+      width: 100%;
+      height: 40px;
+      gap: calc(var(--half-gap) * 2);
+
+      >.button {
+        width: calc(100% / 2 - var(--half-gap));
+        height: 100%;
+        border-radius: 9999px;
+        background-color: #11C;
+        color: #FFF;
+
+        &:hover {
+          background-color: #00A;
+          color: #DDD;
+        }
+      }
+    }
+
+    >.share-button-area {
+      display: flex;
+      justify-content: center;
+      padding: 10px;
+      margin-top: 10px;
+      
+      .share-button {
+        padding: 12px 24px;
+        background-color: #2563eb;
+        color: white;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+        font-size: 14px;
+        font-weight: bold;
+        transition: all 0.2s;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        
+        &:hover {
+          background-color: #1d4ed8;
+          transform: translateY(-1px);
+          box-shadow: 0 4px 6px rgba(0, 0, 0, 0.15);
+        }
+        
+        &:active {
+          background-color: #1e40af;
+          transform: translateY(0);
+        }
+        
+        &.copied {
+          background-color: #10b981;
+        }
+      }
+    }
+
+  }
+}
+
+.dialog-simple {
+
+  // 交代モーダル
+  &.substitute {
+
+    .player-button-area {
+      display: flex;
+      flex-direction: column;
+      max-height: 70vh;
+      gap: 3px;
+      overflow-y: auto;
+      margin-top: 10px;
+
+      button {
+        display: flex;
+        text-align: left;
+        padding: 15px;
+        font-size: 16px;
+        border: none;
+        justify-content: space-between;
+        align-items: center;
+      }
+    }
+  }
+
+}

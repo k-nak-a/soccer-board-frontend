@@ -1,0 +1,20 @@
+.draggable-player {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  cursor: grab;
+  user-select: none;
+  touch-action: none;
+  width: 10vw;
+  height: 10vw;
+
+  >.goals {
+    position: absolute;
+    left: calc(100% + 2px);
+    width: 100px;
+    top: -2px;
+
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: 2px;
+  }
+}
