@@ -93,7 +93,6 @@ const SoccerBoard = ({
     
     // ベンチエリアの実際のサイズ
     const benchWidth = benchRect.width;
-    const benchHeight = benchRect.height;
     
     // ベンチエリアのboard-area内での相対位置
     const benchStartY = benchRect.top - boardRect.top;
@@ -377,7 +376,6 @@ const SoccerBoard = ({
 
   // start: 試合開始処理
   const [isMatchStarted, setIsMatchStarted] = useState(false);
-  const [isCapturing, setIsCapturing] = useState(false);
 
   // チーム名管理
   const [allyTeamName, setAllyTeamName] = useState<string>('味方チーム');
@@ -424,7 +422,6 @@ const SoccerBoard = ({
     setOpponentTeamName(tempOpponentTeamName.trim());
     setTeamNameDialogOpen(false);
 
-    setIsCapturing(true);
     try {
       await captureAndAddToArea('試合開始');
       setIsMatchStarted(true);
@@ -433,8 +430,6 @@ const SoccerBoard = ({
     } catch (error) {
       console.error('試合開始エラー:', error);
       alert('画像のキャプチャに失敗しました');
-    } finally {
-      setIsCapturing(false);
     }
   };
 
@@ -454,7 +449,6 @@ const SoccerBoard = ({
 
   // フォーメーション変更確定
   const confirmFormationChange = async () => {
-    setIsCapturing(true);
     try {
       addMatchLog('formation-change', `フォーメーションチェンジ`)
       await captureAndAddToArea();
@@ -464,8 +458,6 @@ const SoccerBoard = ({
     } catch (error) {
       console.error('画像キャプチャエラー:', error);
       alert('画像のキャプチャに失敗しました');
-    } finally {
-      setIsCapturing(false);
     }
   };
 
@@ -484,7 +476,6 @@ const SoccerBoard = ({
       return;
     }
 
-    setIsCapturing(true);
     try {
       await captureAndAddToArea('前半終了');
       setMatchPhase('half-time');
@@ -492,8 +483,6 @@ const SoccerBoard = ({
     } catch (error) {
       console.error('画像キャプチャエラー:', error);
       alert('画像のキャプチャに失敗しました');
-    } finally {
-      setIsCapturing(false);
     }
 
     // 後半に向けてフォーメーション変更を受け付ける
@@ -505,7 +494,7 @@ const SoccerBoard = ({
 
   // start: 後半開始処理
   const confirmSecondHalfStart = async () => {
-    setIsCapturing(true);
+
     try {
       await captureAndAddToArea('後半開始');
       // 後半開始時の画像として保存
@@ -516,8 +505,6 @@ const SoccerBoard = ({
     } catch (error) {
       console.error('画像キャプチャエラー:', error);
       alert('画像のキャプチャに失敗しました');
-    } finally {
-      setIsCapturing(false);
     }
   };
   // end: 後半開始処理
@@ -534,7 +521,6 @@ const SoccerBoard = ({
       if (!confirmEnd) return;
     }
 
-    setIsCapturing(true);
     try {
       // 最後のキャプチャを追加
       await captureAndAddToArea('試合終了');
@@ -564,11 +550,10 @@ const SoccerBoard = ({
       setMatchPhase('ended');
 
       alert('試合記録を保存しました！🎉');
+
     } catch (error) {
       console.error('試合終了エラー:', error);
       alert('画像の保存に失敗しました');
-    } finally {
-      setIsCapturing(false);
     }
   };
 
