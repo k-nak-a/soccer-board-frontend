@@ -27,12 +27,52 @@
       height: calc(70% - var(--half-gap) - var(--main-padding));
       gap: calc(var(--half-gap) * 2);
 
-      >.image-soccer-court {
+      >.soccer-court {
         display: flex;
         position: relative;
-        z-index: 0;
+        z-index: 1; // benchより手前に出す
         height: calc(65% - var(--half-gap));
         width: 100%;
+
+        >.player-area {
+          position: absolute; 
+          top: 0;
+          left: 0;
+          width: 100%;
+          height: 100%;
+          z-index: 10;
+          pointer-events: none; // player-area自体はクリック無効
+
+          >.draggable-player {
+            position: absolute;
+            transform: translate(-50%, -50%);
+            cursor: grab;
+            user-select: none;
+            touch-action: none;
+            width: 8vh;
+            height: 6vh;
+            container-type: inline-size;
+            pointer-events: painted; // 駒自体はクリック有効
+            z-index: 10;
+
+            &:active {
+              cursor: grabbing; // 追加
+            }
+
+            >.piece-player {
+              font-size: 22cqw;
+            }
+
+            &.in-bench {
+              opacity: 0.95;
+              
+              .piece-player {
+                box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+                border: 2px solid #f59e0b;
+              }
+            }
+          }
+        }
       }
 
       >.bench {
@@ -52,45 +92,6 @@
           color: #666;
           font-weight: bold;
           z-index: 1;
-        }
-      }
-
-      >.player-area {
-        position: absolute; 
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        z-index: 10;
-        pointer-events: none; // player-area自体はクリック無効
-
-        >.draggable-player {
-          position: absolute;
-          transform: translate(-50%, -50%);
-          cursor: grab;
-          user-select: none;
-          touch-action: none;
-          width: 8vh;
-          height: 6vh;
-          container-type: inline-size;
-          pointer-events: painted; // 駒自体はクリック有効
-
-          &:active {
-            cursor: grabbing; // 追加
-          }
-
-          >.piece-player {
-            font-size: 22cqw;
-          }
-
-          &.in-bench {
-            opacity: 0.95;
-            
-            .piece-player {
-              box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-              border: 2px solid #f59e0b;
-            }
-          }
         }
       }
     }
@@ -150,7 +151,34 @@
         }
       }
     }
+  }
 
+  >.capture-area {
+    width: 100%;
+    
+    >.capture-section {
+      margin-bottom: 20px;
+      
+      h3 {
+        text-align: center;
+        margin: 20px 0 10px;
+        font-size: 24px;
+        font-weight: bold;
+        color: #000;
+      }
+      
+      img {
+        width: 100%;
+        display: block;
+      }
+    }
+    
+    >.logs-section {
+      padding: 10px;
+      border-bottom: 1px solid #ddd;
+      font-size: 16px;
+      color: #333;
+    }
   }
 }
 
@@ -178,5 +206,4 @@
       }
     }
   }
-
 }

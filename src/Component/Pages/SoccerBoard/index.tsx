@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, type ReactNode } from 'react';
 import DraggablePlayer from '@/Component/Molcules/Piece/Player';
 import ImageSoccerHalfCourt from '@/Component/Atoms/Images/ImageSoccerHalfCourt';
 import { Box } from '@mui/material';
@@ -24,6 +24,12 @@ type DragState = {
   offsetY: number
 }
 
+type MatchLog = {
+  timestamp: string
+  type: 'goal' | 'substitution' | 'lost-point' | 'formation-change'
+  description: string
+}
+
 type Props = {
   initialPlayers?: Player[];
   width?: string;
@@ -38,10 +44,27 @@ const SoccerBoard = ({
   const [dragging, setDragging] = useState<DragState | null>(null);
   const fieldRef = useRef<HTMLDivElement>(null);
   const boardAreaRef = useRef<HTMLDivElement>(null);
-  const benchRef = useRef<HTMLDivElement>(null); // ベンチエリアのref追加
-  const courtRef = useRef<HTMLDivElement>(null); // コートエリアのref追加
+  const benchRef = useRef<HTMLDivElement>(null);
+  const courtRef = useRef<HTMLDivElement>(null);
+  const captureAreaRef = useRef<HTMLDivElement>(null);
 
   // start: 初期処理
+
+  // start: 試合ログの初期化
+  // 試合ログ
+  const [matchLogElements, setMatchLogElements] = useState<ReactNode[]>([]);
+
+  // ログを追加する関数
+  const addMatchLog = (type: MatchLog['type'], description: string) => {
+    const logIcon = type === 'goal' ? '⚽' : type === 'lost-point' ? '🔴' : '🔄';
+    setMatchLogElements(prev => [
+      ...prev,
+      <div key={prev.length + 1} className="logs-section">
+        {logIcon} {description}
+      </div>
+    ])
+  };
+  // end: 試合ログの初期化
 
   // URLからプレイヤー情報を取得
   const getPlayersFromURL = (): string[] => {
@@ -154,6 +177,37 @@ const SoccerBoard = ({
     return () => window.removeEventListener('resize', handleResize);
   }, [players]);
 
+  // capture共通処理定義
+  // コートエリアをキャプチャしてcapture-areaに追加
+  const captureAndAddToArea = async (label?: string) => {
+    if (!courtRef.current || !captureAreaRef.current) {
+      throw new Error('フィールドが見つかりません');
+    }
+
+    try {
+      const canvas = await html2canvas(courtRef.current, {
+        backgroundColor: '#16a34a',
+        scale: 2,
+        logging: false,
+        useCORS: true
+      });
+
+      const imageData = canvas.toDataURL('image/png');
+      
+      // capture-areaに画像を追加
+      setMatchLogElements(prev => [
+        ...prev,
+        <div key={prev.length + 1} className="capture-section">
+          {label && <h3>{label}</h3>}
+          <img src={imageData} />
+        </div>
+      ])
+    } catch (error) {
+      console.error('画像キャプチャエラー:', error);
+      throw error;
+    }
+  };
+
   // プレイヤーがベンチエリアにいるか判定
   const isPlayerInBench = (player: Player): boolean => {
     if (!benchRef.current || !boardAreaRef.current) return false;
@@ -182,7 +236,6 @@ const SoccerBoard = ({
   };
   // end: 初期処理
 
-
   // プレイヤー追加ボタン クリック
   // start:名前入力モーダル関連
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -192,8 +245,6 @@ const SoccerBoard = ({
   const [matchPhase, setMatchPhase] = useState<'before' | 'first-half' | 'half-time' | 'second-half' | 'ended'>('before');
   // フォーメーション変更モード
   const [isFormationChanging, setIsFormationChanging] = useState(false);
-  // ハーフタイム用の画像保存
-  const [firstHalfEndImage, setFirstHalfEndImage] = useState<string | null>(null);
 
   const openAddPlayerDialog = () => {
     setTempPlayerName('');
@@ -325,9 +376,6 @@ const SoccerBoard = ({
   // end: プレイヤー削除処理
 
   // start: 試合開始処理
-  const [matchStartImage, setMatchStartImage] = useState<string | null>(() => {
-    return localStorage.getItem('matchStart'); // LocalStorageから復元
-  });
   const [isMatchStarted, setIsMatchStarted] = useState(false);
   const [isCapturing, setIsCapturing] = useState(false);
 
@@ -340,27 +388,6 @@ const SoccerBoard = ({
   const [tempAllyTeamName, setTempAllyTeamName] = useState('');
   const [tempOpponentTeamName, setTempOpponentTeamName] = useState('');
   const [teamNameInputStep, setTeamNameInputStep] = useState<'ally' | 'opponent'>('ally');
-
-  // 画像キャプチャ関数
-  const captureField = async (): Promise<string> => {
-    if (!courtRef.current) {
-      throw new Error('フィールドが見つかりません');
-    }
-
-    try {
-      const canvas = await html2canvas(courtRef.current, {
-        backgroundColor: '#16a34a',
-        scale: 2,
-        logging: false,
-        useCORS: true
-      });
-
-      return canvas.toDataURL('image/png');
-    } catch (error) {
-      console.error('画像キャプチャエラー:', error);
-      throw error;
-    }
-  };
 
   // 試合開始処理
   const handleStartMatch = async () => {
@@ -397,14 +424,11 @@ const SoccerBoard = ({
     setOpponentTeamName(tempOpponentTeamName.trim());
     setTeamNameDialogOpen(false);
 
-    // 実際の試合開始処理
     setIsCapturing(true);
     try {
-      const imageData = await captureField();
-      setMatchStartImage(imageData);
-      localStorage.setItem('matchStart', imageData);
+      await captureAndAddToArea('試合開始');
       setIsMatchStarted(true);
-      setMatchPhase('first-half'); // 追加
+      setMatchPhase('first-half');
       alert('試合を開始しました！📸');
     } catch (error) {
       console.error('試合開始エラー:', error);
@@ -432,12 +456,10 @@ const SoccerBoard = ({
   const confirmFormationChange = async () => {
     setIsCapturing(true);
     try {
-      await captureField();
-      
-      // フォーメーション変更画像として保存（必要に応じて）
-      // この画像は記録用に使えます
-      
+      addMatchLog('formation-change', `フォーメーションチェンジ`)
+      await captureAndAddToArea();
       setIsFormationChanging(false);
+
       alert('フォーメーションを確定しました！📸');
     } catch (error) {
       console.error('画像キャプチャエラー:', error);
@@ -464,38 +486,28 @@ const SoccerBoard = ({
 
     setIsCapturing(true);
     try {
-      const imageData = await captureField();
-      setFirstHalfEndImage(imageData);
-      localStorage.setItem('firstHalfEnd', imageData);
-      
+      await captureAndAddToArea('前半終了');
       setMatchPhase('half-time');
-      alert('前半が終了しました！ハーフタイムです。');
+      alert('前半が終了しました！ハーフタイムです。フォーメーションの変更が可能です。');
     } catch (error) {
       console.error('画像キャプチャエラー:', error);
       alert('画像のキャプチャに失敗しました');
     } finally {
       setIsCapturing(false);
     }
+
+    // 後半に向けてフォーメーション変更を受け付ける
+    setIsFormationChanging(true);
   };
   // end: 前半終了処理
 
+
+
   // start: 後半開始処理
-  // 後半開始（フォーメーション変更＋交代モード）
-  const handleSecondHalfStart = () => {
-    if (matchPhase !== 'half-time') {
-      alert('ハーフタイム中ではありません');
-      return;
-    }
-
-    setIsFormationChanging(true);
-    alert('後半開始の準備です。\n交代・フォーメーション変更を行い、完了したら「確定」ボタンを押してください。');
-  };
-
-  // 後半開始確定
   const confirmSecondHalfStart = async () => {
     setIsCapturing(true);
     try {
-      await captureField();
+      await captureAndAddToArea('後半開始');
       // 後半開始時の画像として保存
       
       setIsFormationChanging(false);
@@ -512,41 +524,44 @@ const SoccerBoard = ({
 
   // start: 試合終了処理
   const handleEndMatch = async () => {
-    if (!isMatchStarted || !matchStartImage) {
+    if (!isMatchStarted) {
       alert('先に試合を開始してください');
       return;
     }
 
     if (matchPhase === 'first-half') {
-      alert('前半が終了していません。先に「前半終了」ボタンを押してください。');
-      return;
+      const confirmEnd = window.confirm('前半が終了していませんが、試合を終了しますか？');
+      if (!confirmEnd) return;
     }
 
     setIsCapturing(true);
     try {
-      const endImageData = await captureField();
-      
-      // 試合開始、前半終了、試合終了の3枚を結合
-      let combinedImage: string;
-      
-      if (firstHalfEndImage) {
-        // 3枚結合（試合開始・前半終了・試合終了）
-        combinedImage = await combineThreeImages(matchStartImage, firstHalfEndImage, endImageData);
-      } else {
-        // 2枚結合（試合開始・試合終了）
-        combinedImage = await combineImages(matchStartImage, endImageData);
+      // 最後のキャプチャを追加
+      await captureAndAddToArea('試合終了');
+      // stateの更新がされない状態で画像を作成すると、後半終了時点のキャプチャが消えるので、3秒まつ
+      await sleep(3000)
+
+      // capture-area全体をキャプチャ
+      if (captureAreaRef.current) {
+        const canvas = await html2canvas(captureAreaRef.current, {
+          backgroundColor: '#CCC',
+          scale: 2,
+          logging: false,
+          useCORS: true
+        });
+
+        const imageData = canvas.toDataURL('image/png');
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
+        downloadImage(imageData, `試合記録_${timestamp}.png`);
       }
-      
-      const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
-      downloadImage(combinedImage, `試合記録_${timestamp}.png`);
 
       // クリーンアップ
-      setMatchStartImage(null);
-      setFirstHalfEndImage(null);
+      if (captureAreaRef.current) {
+        captureAreaRef.current.innerHTML = '';
+      }
+      setMatchLogElements([]);
       setIsMatchStarted(false);
       setMatchPhase('ended');
-      localStorage.removeItem('matchStart');
-      localStorage.removeItem('firstHalfEnd');
 
       alert('試合記録を保存しました！🎉');
     } catch (error) {
@@ -557,128 +572,7 @@ const SoccerBoard = ({
     }
   };
 
-  // 3枚の画像を縦に結合
-  const combineThreeImages = async (
-    startImageData: string,
-    halfTimeImageData: string,
-    endImageData: string
-  ): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const startImg = new Image();
-      const halfImg = new Image();
-      const endImg = new Image();
-      let loadedCount = 0;
-
-      const onLoad = () => {
-        loadedCount++;
-        if (loadedCount === 3) {
-          try {
-            const canvas = document.createElement('canvas');
-            const ctx = canvas.getContext('2d');
-            if (!ctx) throw new Error('Canvas context not available');
-
-            const width = Math.max(startImg.width, halfImg.width, endImg.width);
-            const height = startImg.height + halfImg.height + endImg.height + 80;
-
-            canvas.width = width;
-            canvas.height = height;
-
-            ctx.fillStyle = '#ffffff';
-            ctx.fillRect(0, 0, width, height);
-
-            ctx.fillStyle = '#000000';
-            ctx.font = 'bold 24px sans-serif';
-            ctx.textAlign = 'center';
-
-            // 試合開始
-            ctx.fillText('試合開始', width / 2, 30);
-            ctx.drawImage(startImg, (width - startImg.width) / 2, 50);
-
-            // 前半終了
-            const halfY = 50 + startImg.height + 40;
-            ctx.fillText('前半終了', width / 2, halfY - 20);
-            ctx.drawImage(halfImg, (width - halfImg.width) / 2, halfY);
-
-            // 試合終了
-            const endY = halfY + halfImg.height + 40;
-            ctx.fillText('試合終了', width / 2, endY - 20);
-            ctx.drawImage(endImg, (width - endImg.width) / 2, endY);
-
-            resolve(canvas.toDataURL('image/png'));
-          } catch (error) {
-            reject(error);
-          }
-        }
-      };
-
-      startImg.onload = onLoad;
-      halfImg.onload = onLoad;
-      endImg.onload = onLoad;
-      startImg.onerror = () => reject(new Error('開始画像の読み込みエラー'));
-      halfImg.onerror = () => reject(new Error('前半終了画像の読み込みエラー'));
-      endImg.onerror = () => reject(new Error('終了画像の読み込みエラー'));
-
-      startImg.src = startImageData;
-      halfImg.src = halfTimeImageData;
-      endImg.src = endImageData;
-    });
-  };
-
-
-  // 画像結合関数
-  const combineImages = async (
-    startImageData: string,
-    endImageData: string
-  ): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const startImg = new Image();
-      const endImg = new Image();
-      let loadedCount = 0;
-
-      const onLoad = () => {
-        loadedCount++;
-        if (loadedCount === 2) {
-          try {
-            const canvas = document.createElement('canvas');
-            const ctx = canvas.getContext('2d');
-            if (!ctx) throw new Error('Canvas context not available');
-
-            const width = Math.max(startImg.width, endImg.width);
-            const height = startImg.height + endImg.height + 40;
-
-            canvas.width = width;
-            canvas.height = height;
-
-            ctx.fillStyle = '#ffffff';
-            ctx.fillRect(0, 0, width, height);
-
-            ctx.fillStyle = '#000000';
-            ctx.font = 'bold 24px sans-serif';
-            ctx.textAlign = 'center';
-
-            ctx.fillText('試合開始', width / 2, 30);
-            ctx.drawImage(startImg, (width - startImg.width) / 2, 50);
-
-            const endY = 50 + startImg.height + 40;
-            ctx.fillText('試合終了', width / 2, endY - 20);
-            ctx.drawImage(endImg, (width - endImg.width) / 2, endY);
-
-            resolve(canvas.toDataURL('image/png'));
-          } catch (error) {
-            reject(error);
-          }
-        }
-      };
-
-      startImg.onload = onLoad;
-      endImg.onload = onLoad;
-      startImg.onerror = () => reject(new Error('開始画像の読み込みエラー'));
-      endImg.onerror = () => reject(new Error('終了画像の読み込みエラー'));
-
-      startImg.src = startImageData;
-      endImg.src = endImageData;
-    });
-  };
+  const sleep = (time: number) => new Promise((resolve) => setTimeout(resolve, time));
 
   // ダウンロード関数
   const downloadImage = (imageData: string, filename: string) => {
@@ -697,7 +591,6 @@ const SoccerBoard = ({
 
   // 得点時の処理
   const [goalScorerDialogOpen, setGoalScorerDialogOpen] = useState(false);
-  const [isAllyGoal, setIsAllyGoal] = useState(true); // true: 味方の得点, false: 相手の得点
 
   // 得点ボタンクリック
   const handleGetPoint = () => {
@@ -705,12 +598,14 @@ const SoccerBoard = ({
       alert('プレイヤーを追加してください');
       return;
     }
-    setIsAllyGoal(true);
     setGoalScorerDialogOpen(true);
   };
 
   // 得点者を選択
   const handleSelectGoalScorer = (playerId: number) => {
+    const player = players.find(p => p.id === playerId);
+    if (!player) return;
+
     // プレイヤーのゴール数を増やす
     setPlayers(prev =>
       prev.map(p =>
@@ -721,11 +616,8 @@ const SoccerBoard = ({
     );
 
     // スコアを更新
-    if (isAllyGoal) {
-      setGettingPoint(prev => prev + 1);
-    } else {
-      setLostPoint(prev => prev + 1);
-    }
+    setGettingPoint(prev => prev + 1);
+    addMatchLog('goal', `${player.name} がゴール！`);
 
     setGoalScorerDialogOpen(false);
   };
@@ -738,6 +630,7 @@ const SoccerBoard = ({
   // 失点処理
   const handleLostPoint = () => {
         setLostPoint((prev) => prev + 1)
+        addMatchLog('lost-point', '相手チームが得点');
   }
   // end: 得失点関連処理
 
@@ -778,13 +671,12 @@ const SoccerBoard = ({
 
   // 交代実行（位置を入れ替え）
   const executeSubstitution = (outPlayerId: number, inPlayerId: number) => {
-    setPlayers(prev => {
-      const outPlayer = prev.find(p => p.id === outPlayerId);
-      const inPlayer = prev.find(p => p.id === inPlayerId);
-      
-      if (!outPlayer || !inPlayer) return prev;
+    const outPlayer = players.find(p => p.id === outPlayerId);
+    const inPlayer = players.find(p => p.id === inPlayerId);
+    
+    if (!outPlayer || !inPlayer) return;
 
-      // 位置を入れ替え
+    setPlayers(prev => {
       return prev.map(p => {
         if (p.id === outPlayerId) {
           return { ...p, x: inPlayer.x, y: inPlayer.y };
@@ -796,6 +688,7 @@ const SoccerBoard = ({
       });
     });
 
+    addMatchLog('substitution', `交代: OUT ${outPlayer.name}  → IN ${inPlayer.name} `);
     alert('交代が完了しました！');
   };
 
@@ -918,27 +811,29 @@ const SoccerBoard = ({
 
         {/* サッカーボードエリア */}
         <Box ref={boardAreaRef} className={"board-area"}>
-          <div ref={courtRef} className="image-soccer-court">
+          <div ref={courtRef} className="soccer-court">
+            {/* サッカーコートの画像 */}
             <ImageSoccerHalfCourt />
+
+            {/* プレイヤー駒 */}
+            <Box className="player-area">
+              {players.map(player => (
+                <DraggablePlayer
+                  key={player.id}
+                  id={player.id}
+                  position={{ x: player.x, y: player.y }}
+                  onDragStart={handleDragStart}
+                  onTap={handlePlayerTap}
+                  color={player.color || "#fff"}
+                  bgColor={player.bgColor || "darkblue"}
+                  children={player.name}
+                  goals={player.goals}
+                  className={isPlayerInBench(player) ? 'in-bench' : ''}
+                />
+              ))}
+            </Box>
           </div>
           <div ref={benchRef} className={'bench'} />
-
-          {/* プレイヤー駒 */}
-          {players.map(player => (
-            <Box className={"player-wrapper"} key={player.id}>
-              <DraggablePlayer
-                id={player.id}
-                position={{ x: player.x, y: player.y }}
-                onDragStart={handleDragStart}
-                onTap={handlePlayerTap}
-                color={player.color || "#fff"}
-                bgColor={player.bgColor || "darkblue"}
-                children={player.name}
-                goals={player.goals}
-                className={isPlayerInBench(player) ? 'in-bench' : ''}
-              />
-            </Box>
-          ))}
         </Box>
 
         {/* URL共有ボタン（オプション） */}
@@ -989,6 +884,9 @@ const SoccerBoard = ({
               <button className={`button type-red end`} onClick={handleFirstHalfEnd}>
                 前半終了
               </button>
+              <button className={`button type-red end`} onClick={handleEndMatch}>
+                試合終了
+              </button>
             </>
           }
 
@@ -1005,22 +903,13 @@ const SoccerBoard = ({
           }
 
           {/* ハーフタイム中のボタン群 */}
-          {matchPhase === 'half-time' && !isFormationChanging &&
-            <>
-              <button className={`button type-green start`} onClick={handleSecondHalfStart}>
-                後半開始
-              </button>
-            </>
-          }
-
-          {/* 後半開始準備中（フォーメーション変更＋交代） */}
-          {isFormationChanging && matchPhase === 'half-time' && 
+          {matchPhase === 'half-time' &&
             <>
               <button className={`button substitution`} onClick={handleSubstitution}>
                 交代
               </button>
-              <button className={`button type-green confirm`} onClick={confirmSecondHalfStart}>
-                確定して後半開始
+              <button className={`button type-green start`} onClick={confirmSecondHalfStart}>
+                後半開始
               </button>
               <button className={`button cancel`} onClick={cancelFormationChange}>
                 キャンセル
@@ -1114,7 +1003,7 @@ const SoccerBoard = ({
       <DialogSimple
         isOpen={goalScorerDialogOpen}
         onClose={closeGoalScorerDialog}
-        title={isAllyGoal ? "得点者を選択" : "失点（オウンゴール）"}
+        title={"得点者を選択"}
         message="得点したプレイヤーを選択してください"
         firstButton={{text: "キャンセル", onClick: closeGoalScorerDialog}}
         secondButton={{text: "", onClick: () => {}}} // 使わないので空
@@ -1197,7 +1086,9 @@ const SoccerBoard = ({
         }
       />
       {/* 撮ったキャプチャや交代情報などを保持するhiddenな要素 */}
-      <Box className="capture-area"></Box>
+      <Box ref={captureAreaRef} className="capture-area">
+        {matchLogElements}
+      </Box>
     </>
   );
 };
