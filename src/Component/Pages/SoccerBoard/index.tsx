@@ -46,6 +46,7 @@ const SoccerBoard = ({
   const boardAreaRef = useRef<HTMLDivElement>(null);
   const benchRef = useRef<HTMLDivElement>(null);
   const courtRef = useRef<HTMLDivElement>(null);
+  const teamScoreRef = useRef<HTMLDivElement>(null);
   const captureAreaRef = useRef<HTMLDivElement>(null);
 
   // start: 初期処理
@@ -97,25 +98,26 @@ const SoccerBoard = ({
     // ベンチエリアのboard-area内での相対位置
     const benchStartY = benchRect.top - boardRect.top;
     
-    // 駒のサイズ（実際のサイズを取得）
-    const pieceSize = 60; // または実際の駒のサイズ
-    const padding = 10;
+    // 駒のサイズの想定
+    const pieceSizeX = 7 * 8; 
+    const pieceSizeY = 7 * 6;
+    const padding = 1;
     
     // 1行に配置できる駒の数を計算
     const availableWidth = benchWidth - (padding * 2);
-    const itemsPerRow = Math.max(1, Math.floor(availableWidth / (pieceSize + padding)));
+    const itemsPerRow = Math.max(1, Math.floor(availableWidth / (pieceSizeX + padding)));
     
     // 行と列を計算
     const row = Math.floor(index / itemsPerRow);
     const col = index % itemsPerRow;
     
     // 中央揃えのためのオフセット計算
-    const totalRowWidth = Math.min(index + 1, itemsPerRow) * (pieceSize + padding) - padding;
+    const totalRowWidth = Math.min(index + 1, itemsPerRow) * (pieceSizeX + padding) - padding;
     const centerOffset = (benchWidth - totalRowWidth) / 2;
     
     // 位置を計算（board-area基準の絶対座標）
-    const x = centerOffset + col * (pieceSize + padding) + pieceSize / 2;
-    const y = benchStartY + padding + row * (pieceSize + padding) + pieceSize / 2;
+    const x = centerOffset + col * (pieceSizeX + padding) + pieceSizeX / 2;
+    const y = benchStartY + row * (pieceSizeY + padding) + pieceSizeY / 2;
     
     return { x, y };
   };
@@ -178,10 +180,14 @@ const SoccerBoard = ({
 
   // capture共通処理定義
   // コートエリアをキャプチャしてcapture-areaに追加
+  // capture前にプレイヤー位置を保存し、capture後に復元
   const captureAndAddToArea = async (label?: string) => {
     if (!courtRef.current || !captureAreaRef.current) {
       throw new Error('フィールドが見つかりません');
     }
+
+    // 現在のプレイヤー位置を保存
+    const savedPositions = players.map(p => ({ id: p.id, x: p.x, y: p.y }));
 
     try {
       const canvas = await html2canvas(courtRef.current, {
@@ -192,6 +198,14 @@ const SoccerBoard = ({
       });
 
       const imageData = canvas.toDataURL('image/png');
+      
+      // プレイヤー位置を復元
+      setPlayers(prev => 
+        prev.map(p => {
+          const saved = savedPositions.find(s => s.id === p.id);
+          return saved ? { ...p, x: saved.x, y: saved.y } : p;
+        })
+      );
       
       // capture-areaに画像を追加
       setMatchLogElements(prev => [
@@ -522,10 +536,42 @@ const SoccerBoard = ({
     }
 
     try {
+      // DOMを安定させる
+      await sleep(100)
+
+      // TeamAndScoreをキャプチャして最初に追加
+      if (teamScoreRef.current && captureAreaRef.current) {
+        
+        const teamScoreCanvas = await html2canvas(teamScoreRef.current, {
+          backgroundColor: '#ffffff',
+          scale: 2,
+          logging: true, // ログを有効化
+          useCORS: true
+        });
+        
+        const teamScoreImageData = teamScoreCanvas.toDataURL('image/png');
+        
+        setMatchLogElements(prev => [
+          <div key="team-score" className="capture-section">
+            <img src={teamScoreImageData} alt="スコア" />
+          </div>,
+          ...prev
+        ]);
+        
+        // DOMが更新されるまで待機
+        await sleep(500);
+      } else {
+        console.error('ref が null です:', {
+          teamScoreRef: teamScoreRef.current,
+          captureAreaRef: captureAreaRef.current
+        });
+        alert('スコアのキャプチャに失敗しました（refがnull）');
+      }
+
       // 最後のキャプチャを追加
       await captureAndAddToArea('試合終了');
-      // stateの更新がされない状態で画像を作成すると、後半終了時点のキャプチャが消えるので、3秒まつ
-      await sleep(3000)
+      // stateの更新がされない状態で画像を作成すると、後半終了時点のキャプチャが消えるので、1秒まつ
+      await sleep(1000) // 500ms → 1000msに延長
 
       // capture-area全体をキャプチャ
       if (captureAreaRef.current) {
@@ -790,6 +836,7 @@ const SoccerBoard = ({
       >
         {/* 得失点エリア */}
         <TeamAndScore 
+          ref={teamScoreRef}
           ally={{name: allyTeamName, score: gettingPoint}} 
           opponent={{name: opponentTeamName, score: lostPoint}} 
         />
